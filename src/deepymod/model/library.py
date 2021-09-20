@@ -145,6 +145,8 @@ class Library1D(Library):
                 1,
             )
             theta = torch.cat([theta_uv, theta_dudv], dim=1)
+         
+        #print(theta.shape)
 
         return time_deriv_list, [theta]
 

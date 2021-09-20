@@ -34,6 +34,8 @@ def burgers_delta(x: torch.tensor, t: torch.tensor, v: float, A: float):
         / (1 + (torch.exp(R) - 1) / 2 * torch.erfc(z))
     )
     coords = torch.cat((t.reshape(-1, 1), x.reshape(-1, 1)), dim=1)
+    print("COORDS SHAPE IS ",coords.shape)
+    print()
     return coords, u.view(-1, 1)
 
 

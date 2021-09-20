@@ -4,20 +4,22 @@ from ..utils.logger import Logger
 from .convergence import Convergence
 from ..model.deepmod import DeepMoD
 from torch.utils.data import DataLoader
+import matplotlib.pyplot as plt
 
 
 def train(
-    model: DeepMoD,
-    train_dataloader: DataLoader,
-    test_dataloader: DataLoader,
-    optimizer,
-    sparsity_scheduler,
-    split: float = 0.8,
-    exp_ID: str = None,
-    log_dir: str = None,
-    max_iterations: int = 10000,
-    write_iterations: int = 25,
-    **convergence_kwargs
+        model: DeepMoD,
+        train_dataloader: DataLoader,
+        test_dataloader: DataLoader,
+        optimizer,
+        sparsity_scheduler,
+        split: float = 0.8,
+        exp_ID: str = None,
+        log_dir: str = None,
+        max_iterations: int = 10000,
+        write_iterations: int = 25,
+        reg_coef: float = 0.5,
+        **convergence_kwargs
 ) -> None:
     """Trains the DeepMoD model. This function automatically splits the data set in a train and test set.
 
@@ -40,32 +42,28 @@ def train(
     n_features = train_dataloader[0][1].shape[-1]
     # n_features = model.func_approx.modules()
     # Training
+    loss_list = []
+    mse_list = []
+    reg_list = []
     convergence = Convergence(**convergence_kwargs)
     for iteration in torch.arange(0, max_iterations):
         # Training variables defined as: loss, mse, regularisation
-        batch_losses = torch.zeros(
-            (3, n_features, len(train_dataloader)),
-            device=train_dataloader.device,
-        )
+        batch_losses = torch.zeros((3, n_features, len(train_dataloader)), device=train_dataloader.device, )
         for batch_idx, train_sample in enumerate(train_dataloader):
             data_train, target_train = train_sample
             # ================== Training Model ============================
             prediction, time_derivs, thetas = model(data_train)
-            batch_losses[1, :, batch_idx] = torch.mean(
-                (prediction - target_train) ** 2, dim=-2
-            )  # loss per output
-            batch_losses[2, :, batch_idx] = torch.stack(
-                [
-                    torch.mean((dt - theta @ coeff_vector) ** 2)
-                    for dt, theta, coeff_vector in zip(
-                        time_derivs,
-                        thetas,
-                        model.constraint_coeffs(scaled=False, sparse=True),
-                    )
-                ]
-            )
+            batch_losses[1, :, batch_idx] = torch.mean((prediction - target_train) ** 2, dim=-2)  # loss per output
+            batch_losses[2, :, batch_idx] = torch.stack([torch.mean((dt - theta @ coeff_vector) ** 2)
+                                                         for dt, theta, coeff_vector in zip(
+                    time_derivs,
+                    thetas,
+                    model.constraint_coeffs(scaled=False, sparse=True),
+                )
+                                                         ]
+                                                        )
             batch_losses[0, :, batch_idx] = (
-                batch_losses[1, :, batch_idx] + batch_losses[2, :, batch_idx]
+                    batch_losses[1, :, batch_idx] + reg_coef*batch_losses[2, :, batch_idx]
             )
 
             # Optimizer step
@@ -74,6 +72,7 @@ def train(
             optimizer.step()
 
         loss, mse, reg = torch.mean(batch_losses.cpu().detach(), axis=-1)
+
 
         if iteration % write_iterations == 0:
             # ================== Validation costs ================
@@ -103,6 +102,11 @@ def train(
                 MSE_test=mse_test,
             )
 
+            print(loss.dtype)
+            loss_list.append(loss)
+            mse_list.append(mse)
+            reg_list.append(reg)
+
             # ================== Sparsity update =============
             # Updating sparsity
             update_sparsity = sparsity_scheduler(
@@ -122,4 +126,11 @@ def train(
             converged = convergence(iteration, l1_norm)
             if converged:
                 break
+
+    plt.figure(figsize=(15, 5))
+    plt.plot(loss_list)
+    #plt.plot(mse_list)
+    #plt.plot(reg_list)
+    plt.grid(True)
+    plt.show()
     logger.close(model)

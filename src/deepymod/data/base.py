@@ -55,7 +55,7 @@ class Dataset(torch.utils.data.Dataset):
             self.apply_shuffle = apply_shuffle
         self.device = device
         self.shuffle = shuffle
-        self.coords, self.data = self.load(**self.load_kwargs)
+        self.coords, self.data = self.load[0],self.load[1]
         # Ensure the data that loaded is not 0D/1D
         assert (
             len(self.coords.shape) >= 2
