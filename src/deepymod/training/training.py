@@ -45,6 +45,7 @@ def train(
     loss_list = []
     mse_list = []
     reg_list = []
+    mse_test_list = []
     convergence = Convergence(**convergence_kwargs)
     for iteration in torch.arange(0, max_iterations):
         # Training variables defined as: loss, mse, regularisation
@@ -102,9 +103,10 @@ def train(
                 MSE_test=mse_test,
             )
 
-            print(loss.dtype)
+            print()
             loss_list.append(loss)
             mse_list.append(mse)
+            mse_test_list.append(mse_test)
             reg_list.append(reg)
 
             # ================== Sparsity update =============
@@ -128,9 +130,11 @@ def train(
                 break
 
     plt.figure(figsize=(15, 5))
-    plt.plot(loss_list)
+    plt.plot(loss_list,label="Training Loss")
+    plt.plot(mse_test_list,label="Test Loss")
     #plt.plot(mse_list)
     #plt.plot(reg_list)
     plt.grid(True)
+    plt.legend()
     plt.show()
     logger.close(model)
